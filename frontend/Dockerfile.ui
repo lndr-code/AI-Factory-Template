@@ -1,0 +1,42 @@
+# ---------------------------------------------------------------------------
+# Stage 1: Build the React frontend
+# ---------------------------------------------------------------------------
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Install dependencies first (separate layer for cache efficiency)
+COPY ui/package*.json ./
+RUN npm ci
+
+# Build Vite + React → /app/dist/
+COPY ui/ ./
+RUN npm run build
+
+# ---------------------------------------------------------------------------
+# Stage 2: Runtime image (FastAPI + Docker CLI for the MVP run bridge)
+# ---------------------------------------------------------------------------
+FROM python:3.11-slim
+
+# Docker CLI is required for the MVP bridge:
+#   "docker exec ai-factory-dev python /workspace/run_graph.py"
+# The dev container holds the full tool stack (claude CLI, API keys, appuser)
+# that run_graph.py requires. This is intentional for local use.
+# Override with RUN_COMMAND env var if running natively.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends docker.io \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.ui.txt .
+RUN pip install --no-cache-dir -r requirements.ui.txt
+
+# Copy API source and built React assets
+COPY api/ ./api/
+COPY --from=builder /app/dist ./ui/dist
+
+# Default: workspace is the project root mounted as /workspace
+ENV PROJECT_ROOT=/workspace
+
+EXPOSE 3000
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "3000"]

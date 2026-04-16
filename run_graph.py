@@ -8,7 +8,7 @@ Usage:
     # Run a single specific task:
     python run_graph.py --task tasks/01_setup.md
 
-Tasks marked as done (filename contains '.done.') are automatically skipped.
+Tasks marked as terminal (filename contains '.done.', '.failed.', or '.blocked.') are skipped.
 """
 import argparse
 import os
@@ -16,17 +16,31 @@ import glob
 
 from orchestrator.graph import app
 
-PROJECT_ROOT = os.environ.get("PROJECT_ROOT", "/workspace")
+PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.getcwd())
+TERMINAL_TASK_MARKERS = {
+    ".done.": "done",
+    ".failed.": "failed",
+    ".blocked.": "blocked",
+}
+
+
+def task_lifecycle_status(task_file: str) -> str | None:
+    basename = os.path.basename(task_file)
+    for marker, status in TERMINAL_TASK_MARKERS.items():
+        if marker in basename:
+            return status
+    return None
 
 
 def find_open_tasks() -> list[str]:
-    """Find all task .md files, sorted by filename, skipping .done. files."""
+    """Find all task .md files, sorted by filename, skipping terminal lifecycle files."""
     tasks_dir = os.path.join(PROJECT_ROOT, "tasks")
     all_tasks = sorted(glob.glob(os.path.join(tasks_dir, "*.md")))
     open_tasks = [
         os.path.relpath(t, PROJECT_ROOT).replace("\\", "/")
         for t in all_tasks
-        if ".done." not in os.path.basename(t) and os.path.basename(t) != ".gitkeep"
+        if task_lifecycle_status(t) is None
+        and os.path.basename(t) != ".gitkeep"
     ]
     return open_tasks
 
@@ -35,9 +49,64 @@ def run_task(task_file: str):
     print(f"\n{'='*60}")
     print(f"  Running task: {task_file}")
     print(f"{'='*60}")
+    terminal_status = task_lifecycle_status(task_file)
+    if terminal_status:
+        result = {
+            "current_task_file": task_file,
+            "task_status": terminal_status,
+            "final_report": f"Task already marked as {terminal_status}: {task_file}",
+        }
+        print(f"\n  Result: {result['final_report']}")
+        return result
     result = app.invoke({"current_task_file": task_file})
     print(f"\n  Result: {result.get('final_report', 'No report generated.')}")
     return result
+
+
+def _has_substantive_content(text: str) -> bool:
+    """
+    Language-agnostic check: True if the text has non-empty lines that are
+    not Markdown headings (#) or HTML comments (<!--).
+    Replaces the previous hardcoded German sentinel string check.
+    """
+    ignored_fragments = (
+        "lassen sie diese datei leer",
+        "leave this file empty",
+    )
+    for line in text.splitlines():
+        stripped = line.strip()
+        lower = stripped.lower()
+        if not stripped or stripped.startswith("#") or stripped.startswith("<!--"):
+            continue
+        if any(fragment in lower for fragment in ignored_fragments):
+            continue
+        if stripped:
+            return True
+    return False
+
+
+def check_and_prompt_questions() -> bool:
+    questions_file = os.path.join(PROJECT_ROOT, "questions", "open_questions.md")
+    if not os.path.exists(questions_file):
+        return False
+    with open(questions_file, "r", encoding="utf-8") as f:
+        content = f.read().strip()
+    if not _has_substantive_content(content):
+        return False
+    print(f"\n[?] The agents have asked questions:\n{content}\n")
+    answers = input("Please provide answers (or press Enter to skip): ")
+    if answers.strip():
+        answers_file = os.path.join(PROJECT_ROOT, "questions", "answered_questions.md")
+        os.makedirs(os.path.dirname(answers_file), exist_ok=True)
+        with open(answers_file, "a", encoding="utf-8") as af:
+            af.write(f"\n## Q:\n{content}\n## A:\n{answers}\n")
+        # Reset open_questions.md — language-agnostic empty state
+        with open(questions_file, "w", encoding="utf-8") as f:
+            f.write("# Open Questions\n")
+        return True
+    else:
+        print("Skipping answers for now.")
+        return False
 
 
 def main():
@@ -47,25 +116,45 @@ def main():
         type=str,
         default=None,
         help="Path to a specific task file relative to PROJECT_ROOT (e.g. tasks/01_setup.md). "
-             "If not provided, all open tasks are run in sorted order."
+             "If not provided, all open tasks are run in sorted order.",
     )
     args = parser.parse_args()
 
     if args.task:
-        tasks = [args.task]
-    else:
-        tasks = find_open_tasks()
-        if not tasks:
-            print("No open tasks found in /tasks/. Add .md files to get started.")
-            return
-        print(f"\nFound {len(tasks)} open task(s):")
-        for t in tasks:
-            print(f"  - {t}")
+        result = run_task(args.task)
+        check_and_prompt_questions()
+        if result.get("task_status") == "failed":
+            raise SystemExit(1)
+        return
 
     results = []
-    for task in tasks:
+    while True:
+        tasks = find_open_tasks()
+
+        if not tasks:
+            print("No open tasks found. Triggering architect flow...")
+            result = app.invoke({"current_task_file": ""})
+            answered = check_and_prompt_questions()
+            if result.get("task_status") == "awaiting_input":
+                if answered:
+                    continue
+                print("Planning is waiting for answers. Exiting loop.")
+                break
+            if result.get("task_status") == "failed":
+                print("Architecture step failed. Exiting loop.")
+                break
+            tasks = find_open_tasks()
+            if not tasks:
+                print("No open tasks found after architecture step. Exiting loop.")
+                break
+
+        task = tasks[0]
         result = run_task(task)
         results.append(result)
+        check_and_prompt_questions()
+        if result.get("task_status") != "done":
+            print("Task did not complete successfully. Exiting loop to avoid repeated retries.")
+            break
 
     print(f"\n{'='*60}")
     print(f"  All tasks complete. {len(results)} task(s) processed.")

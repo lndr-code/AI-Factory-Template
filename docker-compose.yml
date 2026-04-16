@@ -1,4 +1,29 @@
 services:
+  # ---------------------------------------------------------------------------
+  # UI service — MVP frontend (FastAPI + React)
+  # Mounts the same workspace volume as the dev container.
+  # Requires dev container to be running for the "Start Run" button to work.
+  # Start with: docker-compose up -d ui
+  # Open at:    http://localhost:3000
+  # ---------------------------------------------------------------------------
+  ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.ui
+    container_name: ai-factory-ui
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./:/workspace                     # shared workspace with dev container
+      - /var/run/docker.sock:/var/run/docker.sock  # needed for docker exec bridge
+    environment:
+      - PROJECT_ROOT=/workspace
+      # Override the run command if not using docker exec:
+      # - RUN_COMMAND=python /workspace/run_graph.py
+      # - RUN_CONTAINER=ai-factory-dev
+    restart: unless-stopped
+
   dev:
     build: .
     container_name: ai-factory-dev
@@ -7,3 +32,26 @@ services:
       - ./:/workspace
     stdin_open: true
     tty: true
+    environment:
+      # Gemini — role-specific models
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_ARCHITECT_MODEL=${GEMINI_ARCHITECT_MODEL:-gemini-2.5-pro}
+      - GEMINI_REVIEW_MODEL=${GEMINI_REVIEW_MODEL:-gemini-2.5-pro}
+
+      # OpenAI — Critic + optional Codex fallback
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_CRITIC_MODEL=${OPENAI_CRITIC_MODEL:-gpt-5}
+      - OPENAI_BUILDER_MODEL=${OPENAI_BUILDER_MODEL:-gpt-4o}
+
+      # Claude Code (primary builder)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+
+      # Feature flags
+      - CODEX_ENABLED=${CODEX_ENABLED:-false}
+      - VALIDATION_COMMAND=${VALIDATION_COMMAND:-}
+      - VALIDATION_TIMEOUT=${VALIDATION_TIMEOUT:-300}
+      - CLAUDE_TIMEOUT=${CLAUDE_TIMEOUT:-600}
+      - MAX_TASK_RETRIES=${MAX_TASK_RETRIES:-2}
+
+      # Workspace
+      - PROJECT_ROOT=/workspace

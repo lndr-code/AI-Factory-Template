@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y \
 
 RUN npm install -g @anthropic-ai/claude-code
 
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
 ENV CLAUDE_CODE_BUBBLEWRAP=1
 
 # Create non-root user so Claude Code can run with --dangerously-skip-permissions

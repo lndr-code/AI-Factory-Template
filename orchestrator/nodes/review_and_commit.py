@@ -1,57 +1,136 @@
 import os
 import subprocess
+
+from orchestrator.git_utils import (
+    assert_head_unchanged,
+    assert_index_subset,
+    get_head_sha,
+    get_status_porcelain,
+    run_git,
+    stage_paths,
+)
 from orchestrator.state import OrchestratorState
 
-PROJECT_ROOT = os.environ.get("PROJECT_ROOT", "/workspace")
+
+PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.getcwd())
 
 
-def review_and_commit(state: OrchestratorState) -> OrchestratorState:
+def _run_validation() -> tuple[bool, str]:
+    """
+    Run VALIDATION_COMMAND if set. Returns (passed: bool, output: str).
+    If not set, skips validation and returns True with an informational message.
+    """
+    cmd = os.environ.get("VALIDATION_COMMAND", "").strip()
+    if not cmd:
+        return True, "Validation skipped - VALIDATION_COMMAND not set."
+
     try:
-        # 1. Check whether the git repository has changes
-        git_status = subprocess.run(
-            ["git", "status", "--short"],
+        result = subprocess.run(
+            cmd,
+            shell=True,
             capture_output=True,
             text=True,
             cwd=PROJECT_ROOT,
-            check=True
+            timeout=int(os.environ.get("VALIDATION_TIMEOUT", "300")),
         )
-        state["git_status_output"] = git_status.stdout
+        output = result.stdout + result.stderr
+        if result.returncode == 0:
+            return True, output
+        return False, f"Validation failed (exit {result.returncode}):\n{output}"
+    except subprocess.TimeoutExpired:
+        return False, "Validation timed out."
+    except Exception as e:
+        return False, f"Validation error: {e}"
 
-        # 2. If there are no changes, nothing to commit
-        if not git_status.stdout.strip():
+
+def _done_task_path(task_file: str) -> str:
+    base, ext = os.path.splitext(task_file)
+    return f"{base}.done{ext or '.md'}"
+
+
+def review_and_commit(state: OrchestratorState) -> OrchestratorState:
+    """
+    Commit node: runs after reviewer approval.
+    Validation failures become retry feedback. Successful commits include the
+    task's .done.md lifecycle marker in the same commit as the implementation.
+    """
+    try:
+        changed_files = list(state.get("changed_files", []))
+        status = get_status_porcelain()
+        state["git_status_output"] = "\n".join(f"{v} {k}" for k, v in status.items())
+        baseline_sha = state.get("baseline_sha") or get_head_sha()
+        assert_head_unchanged(baseline_sha, "review and commit")
+
+        if not changed_files:
             state["review_status"] = "no_changes"
+            state["task_status"] = "failed"
+            state["last_error"] = "No task-scoped changes available to commit."
             return state
 
-        # 3. If changes exist, stage and commit
-        state["test_output"] = "Tests skipped — add your test runner here"
+        assert_index_subset(changed_files)
 
-        subprocess.run(["git", "add", "."], check=True, cwd=PROJECT_ROOT)
-        subprocess.run(
-            ["git", "commit", "-m", "Automated builder update"],
-            check=True,
-            cwd=PROJECT_ROOT,
-            capture_output=True,
-            text=True
-        )
+        validation_passed, validation_output = _run_validation()
+        state["test_output"] = validation_output
 
-        # 4. Record commit SHA
-        sha_result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            check=True,
-            cwd=PROJECT_ROOT,
-            capture_output=True,
-            text=True
-        )
-        state["commit_sha"] = sha_result.stdout.strip()
+        if not validation_passed:
+            retry_count = state.get("validation_retry_count", 0) + 1
+            state["validation_retry_count"] = retry_count
+            state["retry_count"] = retry_count
+            state["review_status"] = "needs_revision"
+            state["validation_status"] = "failed"
+            state["retry_feedback"] = validation_output
+            state["last_error"] = validation_output
+            if retry_count > state.get("max_validation_retries", state.get("max_retries", 2)):
+                state["review_status"] = "failed"
+                state["task_status"] = "failed"
+            return state
+
+        state["validation_status"] = "passed"
+
+        task_file = state.get("current_task_file", "unknown-task")
+        task_name = os.path.basename(task_file).replace(".md", "")
+        commit_message = f"feat: complete {task_name} [automated]"
+        stage_candidates = set(changed_files)
+
+        if task_file and task_file != "unknown-task":
+            full_path = os.path.join(PROJECT_ROOT, task_file)
+            if os.path.exists(full_path) and ".done." not in task_file:
+                done_task_file = _done_task_path(task_file)
+                done_path = os.path.join(PROJECT_ROOT, done_task_file)
+                if os.path.exists(done_path):
+                    raise RuntimeError(f"Done task file already exists: {done_task_file}")
+                was_tracked = bool(run_git(["ls-files", "--", task_file], check=False).stdout.strip())
+                os.rename(full_path, done_path)
+                if was_tracked:
+                    stage_candidates.add(task_file)
+                stage_candidates.add(done_task_file.replace("\\", "/"))
+
+        stage_paths(stage_candidates)
+        assert_index_subset(stage_candidates)
+        assert_head_unchanged(baseline_sha, "final commit boundary")
+        run_git(["commit", "-m", commit_message], check=True)
+
+        state["commit_sha"] = get_head_sha()
         state["review_status"] = "success"
+        state["task_status"] = "done"
+        state["retry_feedback"] = None
+        state["validation_retry_count"] = 0
 
     except subprocess.CalledProcessError as e:
         state["review_status"] = "failed"
         state["builder_status"] = "failed"
+        state["task_status"] = "failed"
         state["last_error"] = f"Git operation failed: {e.stderr if e.stderr else str(e)}"
+    except RuntimeError as e:
+        state["review_status"] = "policy_violation"
+        state["builder_status"] = "policy_violation"
+        state["task_status"] = "failed"
+        state["policy_violation"] = "commit_boundary"
+        state["last_error"] = str(e)
     except Exception as e:
         state["review_status"] = "failed"
         state["builder_status"] = "failed"
+        state["task_status"] = "failed"
         state["last_error"] = str(e)
 
     return state

@@ -116,6 +116,16 @@ AI-Factory-Template/
 | `PROJECT_ROOT` | `/workspace` | Pfad zum Projektverzeichnis im Container |
 | `ANTHROPIC_API_KEY` | — | Für Claude API (falls benötigt) |
 
+### Lifecycle- und Git-Regeln
+
+- Builder duerfen keine Commits erzeugen; der Orchestrator bricht ab, wenn sich `HEAD` waehrend eines Builder-Laufs aendert.
+- Eine Task wird erst nach Review-Freigabe und erfolgreicher Validation in `.done.md` umbenannt.
+- Die `.done.md`-Markierung wird im selben Commit wie die Task-Aenderungen gespeichert.
+- Der Reviewer bewertet nur Aenderungen seit der vor dem Task erfassten Workspace-Baseline.
+- Offene Rueckfragen stoppen die Planung; beantwortete Fragen werden beim naechsten Planungsdurchlauf beruecksichtigt.
+
+Zusaetzliche wichtige Variablen: `GEMINI_API_KEY`, `OPENAI_API_KEY`, `VALIDATION_COMMAND`, `VALIDATION_TIMEOUT`, `MAX_TASK_RETRIES`, `MAX_REVIEW_RETRIES`, `MAX_VALIDATION_RETRIES`, `BUILDER_FILE_ALLOWED_ROOTS`.
+
 ### Tasks als "erledigt" markieren
 
 Benenne eine Task-Datei um und füge `.done.` ein — sie wird dann übersprungen:

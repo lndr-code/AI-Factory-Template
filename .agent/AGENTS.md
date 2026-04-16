@@ -47,5 +47,6 @@ After completing a task, append a report entry to `/reports/session-report.md`:
 ## Git Rules
 
 - Work exclusively on the current branch.
-- Commit only when the task is fully completed.
-- Use clear, conventional commit messages (e.g. `feat: implement user authentication screen`).
+- Do not create git commits.
+- Leave all commits to the orchestrator after review and validation approval.
+- Do not stage unrelated files.
