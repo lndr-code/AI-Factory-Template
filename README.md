@@ -14,6 +14,19 @@ Du beschreibst dein Ziel
     → reports/session-report.md ansehen
 ```
 
+## Architektur
+
+| Rolle | Provider | Auth |
+|---|---|---|
+| Lead Architect | Gemini API | `GEMINI_API_KEY` |
+| Critic | OpenAI API | `OPENAI_API_KEY` |
+| Primary Builder | Claude Code CLI | `claude login` (Claude.ai / Claude Pro) |
+| Fallback Builder | Codex CLI | `codex auth login` (ChatGPT Pro) oder `OPENAI_API_KEY` |
+| Reviewer | Gemini API | `GEMINI_API_KEY` |
+
+**API-key basiert:** Gemini und OpenAI Critic benötigen einen API-Key in `.env`.  
+**Login-basiert:** Claude Code und Codex CLI werden einmalig interaktiv authentifiziert — kein API-Key nötig.
+
 ## Setup für ein neues Projekt
 
 ### 1. Template verwenden
@@ -56,15 +69,35 @@ tasks/
 
 Jede Task-Datei beschreibt: **Was** soll gebaut werden (Requirements), **Deliverables** und **Verification**.
 
-### 4. Docker Container starten
+### 4. Umgebungsvariablen konfigurieren
+
+```bash
+cp .env.example .env
+# Trage ein: GEMINI_API_KEY und OPENAI_API_KEY
+```
+
+### 5. Docker Container starten
 
 ```bash
 docker-compose up -d
 ```
 
-> Beim ersten Start wird der Container gebaut (~2-3 Minuten). Claude Code wird automatisch installiert.
+> Beim ersten Start wird der Container gebaut (~2-3 Minuten). Claude Code und Codex CLI werden automatisch installiert.
 
-### 5. Orchestrator ausführen
+### 6. Builder-Authentifizierung einrichten
+
+Einmalig nach dem ersten Container-Start:
+
+```bash
+# Claude Code (Primary Builder) — Claude.ai / Claude Pro Login
+docker exec -it ai-factory-dev claude login
+
+# Codex CLI (Fallback Builder) — nur nötig wenn CODEX_ENABLED=true
+docker exec -it ai-factory-dev codex auth login
+# Alternativ: OPENAI_API_KEY in .env setzen
+```
+
+### 7. Orchestrator ausführen
 
 ```bash
 # Alle offenen Tasks automatisch abarbeiten:
@@ -74,7 +107,7 @@ docker exec -it ai-factory-dev python run_graph.py
 docker exec -it ai-factory-dev python run_graph.py --task tasks/01_project_setup.md
 ```
 
-### 6. Ergebnisse prüfen
+### 8. Ergebnisse prüfen
 
 - **`reports/session-report.md`** — Was wurde gebaut, welche Dateien geändert, offene Punkte
 - **Git History** — Jede Task = 1 Commit, vollständige Nachvollziehbarkeit
@@ -87,10 +120,14 @@ AI-Factory-Template/
 ├── orchestrator/               # LangGraph Agenten-Orchestrator
 │   ├── graph.py                # State Machine: preflight → build → review → report
 │   ├── state.py                # Geteilter State zwischen den Nodes
+│   ├── llm/
+│   │   ├── roles.py            # Rolle → Provider → Modell Mapping
+│   │   └── providers.py        # Gemini & OpenAI SDK Wrapper
 │   └── nodes/
 │       ├── preflight_environment.py   # Prüft Tools & Dateien
-│       ├── build_with_claude.py       # Claude Code als Coding Agent
-│       ├── fallback_build_with_codex.py  # Fallback falls Claude scheitert
+│       ├── build_with_claude.py       # Claude Code CLI als Primary Builder
+│       ├── fallback_build_with_codex.py  # Codex CLI als Fallback Builder
+│       ├── review_with_gemini.py      # Gemini Code Review
 │       ├── review_and_commit.py       # Git add + commit
 │       └── report_done.py             # Gibt Zusammenfassung aus
 ├── .agent/
@@ -101,7 +138,7 @@ AI-Factory-Template/
 ├── tasks/                     # ← DEIN PROJEKT: nummerierte Task-Dateien
 ├── reports/                   # Automatisch generierte Session-Reports
 ├── app/                       # Automatisch generierter App-Code
-├── Dockerfile                 # Python 3.11 + Node + Claude Code + Git
+├── Dockerfile                 # Python 3.11 + Node + Claude Code + Codex + Git
 ├── docker-compose.yml         # Container-Setup
 ├── entrypoint.sh              # Setzt Permissions & Git-Config beim Start
 └── run_graph.py               # Einstiegspunkt für den Orchestrator
@@ -113,18 +150,25 @@ AI-Factory-Template/
 
 | Variable | Default | Beschreibung |
 |---|---|---|
+| `GEMINI_API_KEY` | — | Pflicht: Architect & Reviewer |
+| `OPENAI_API_KEY` | — | Pflicht: Critic; optional: Codex fallback auth |
+| `GEMINI_ARCHITECT_MODEL` | `gemini-2.5-pro` | Modell für Architect |
+| `GEMINI_REVIEW_MODEL` | `gemini-2.5-pro` | Modell für Reviewer |
+| `OPENAI_CRITIC_MODEL` | `gpt-5.4-mini` | Modell für Critic |
+| `CODEX_ENABLED` | `false` | Codex CLI Fallback aktivieren |
+| `CLAUDE_TIMEOUT` | `600` | Timeout für Claude Code CLI (Sekunden) |
+| `CODEX_TIMEOUT` | `300` | Timeout für Codex CLI (Sekunden) |
+| `VALIDATION_COMMAND` | — | Test-Befehl vor Commit (z.B. `pytest tests/`) |
+| `MAX_TASK_RETRIES` | `2` | Max Wiederholungen pro Task |
 | `PROJECT_ROOT` | `/workspace` | Pfad zum Projektverzeichnis im Container |
-| `ANTHROPIC_API_KEY` | — | Für Claude API (falls benötigt) |
 
 ### Lifecycle- und Git-Regeln
 
-- Builder duerfen keine Commits erzeugen; der Orchestrator bricht ab, wenn sich `HEAD` waehrend eines Builder-Laufs aendert.
+- Builder dürfen keine Commits erzeugen; der Orchestrator bricht ab, wenn sich `HEAD` während eines Builder-Laufs ändert.
 - Eine Task wird erst nach Review-Freigabe und erfolgreicher Validation in `.done.md` umbenannt.
-- Die `.done.md`-Markierung wird im selben Commit wie die Task-Aenderungen gespeichert.
-- Der Reviewer bewertet nur Aenderungen seit der vor dem Task erfassten Workspace-Baseline.
-- Offene Rueckfragen stoppen die Planung; beantwortete Fragen werden beim naechsten Planungsdurchlauf beruecksichtigt.
-
-Zusaetzliche wichtige Variablen: `GEMINI_API_KEY`, `OPENAI_API_KEY`, `VALIDATION_COMMAND`, `VALIDATION_TIMEOUT`, `MAX_TASK_RETRIES`, `MAX_REVIEW_RETRIES`, `MAX_VALIDATION_RETRIES`, `BUILDER_FILE_ALLOWED_ROOTS`.
+- Die `.done.md`-Markierung wird im selben Commit wie die Task-Änderungen gespeichert.
+- Der Reviewer bewertet nur Änderungen seit der vor dem Task erfassten Workspace-Baseline.
+- Offene Rückfragen stoppen die Planung; beantwortete Fragen werden beim nächsten Planungsdurchlauf berücksichtigt.
 
 ### Tasks als "erledigt" markieren
 
@@ -139,12 +183,18 @@ tasks/02_database_schema.md      ← wird ausgeführt
 
 - Docker Desktop (Windows/Mac) oder Docker Engine (Linux)
 - Git
-- Anthropic API Key (für Claude Code)
+- Gemini API Key
+- OpenAI API Key
+- Claude.ai / Claude Pro Account (für Claude Code Login)
+- Optional: ChatGPT Pro Account (für Codex Fallback Login)
 
 ## FAQ
 
 **Q: Was passiert wenn Claude scheitert?**  
-A: Der Orchestrator versucht automatisch Codex als Fallback. Scheitert auch Codex, wird ein Fehlerbericht erstellt.
+A: Der Orchestrator versucht automatisch Codex CLI als Fallback (wenn `CODEX_ENABLED=true`). Scheitert auch Codex, wird ein Fehlerbericht erstellt.
+
+**Q: Brauche ich einen Anthropic API Key?**  
+A: Nein. Claude Code authentifiziert sich via `claude login` (Claude.ai / Claude Pro Account). Kein API-Key nötig.
 
 **Q: Kann ich mehrere Projekte parallel betreiben?**  
 A: Ja — einfach das Template mehrfach klonen. Jedes Projekt ist ein eigenständiger Container.

@@ -22,16 +22,18 @@ def preflight_environment(state: OrchestratorState) -> OrchestratorState:
     if not shutil.which("git"):
         errors.append("git not found in PATH.")
 
-    # Issue 4: Check required API keys for non-interactive container use
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        errors.append(
-            "ANTHROPIC_API_KEY is not set. "
-            "The Claude Code CLI requires it for non-interactive authentication."
-        )
+    # Claude Code uses login-based OAuth (claude login) — no API key required.
+    # GEMINI_API_KEY is always required for the Reviewer role.
     if not os.environ.get("GEMINI_API_KEY"):
         errors.append("GEMINI_API_KEY is not set.")
-    if os.environ.get("CODEX_ENABLED", "false").lower() == "true" and not os.environ.get("OPENAI_API_KEY"):
-        errors.append("CODEX_ENABLED=true but OPENAI_API_KEY is not set.")
+    # Codex fallback: verify the binary is installed. Auth is either OPENAI_API_KEY
+    # or stored OAuth credentials from `codex auth login` — checked at runtime.
+    if os.environ.get("CODEX_ENABLED", "false").lower() == "true":
+        if not shutil.which("codex"):
+            errors.append(
+                "CODEX_ENABLED=true but codex binary not found in PATH. "
+                "Ensure @openai/codex is installed (npm install -g @openai/codex)."
+            )
 
     # Check project workspace
     if not os.path.exists(PROJECT_ROOT):
