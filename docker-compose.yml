@@ -31,6 +31,8 @@ services:
     volumes:
       - ./:/workspace
       - appuser_home:/home/appuser
+      - claude_auth:/home/appuser/.claude
+      - codex_auth:/home/appuser/.codex
     stdin_open: true
     tty: true
     environment:
@@ -60,3 +62,7 @@ services:
 
 volumes:
   appuser_home:
+  claude_auth:
+    external: true
+  codex_auth:
+    external: true

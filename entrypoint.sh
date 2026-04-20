@@ -8,6 +8,12 @@ set -e
 # Fix ownership of workspace (may be root-owned after Docker bind mount)
 chown -R appuser:appuser /workspace
 
+# Ensure auth dirs exist and are owned by appuser (external volumes start empty;
+# Windows Docker resets ownership to root on every start)
+mkdir -p /home/appuser/.claude /home/appuser/.codex
+chown appuser:appuser /home/appuser/.claude /home/appuser/.codex
+chmod 700 /home/appuser/.claude /home/appuser/.codex
+
 # Configure git identity and safe.directory for appuser
 su -s /bin/bash appuser -c "
   git config --global user.name 'Orchestrator Bot'

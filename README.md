@@ -76,7 +76,22 @@ cp .env.example .env
 # Trage ein: GEMINI_API_KEY und OPENAI_API_KEY
 ```
 
-### 5. Docker Container starten
+### 5. Geteilte Auth-Volumes einmalig erstellen
+
+Diese Volumes werden **einmalig pro Docker-Host** erstellt – nicht pro Projekt.
+Sie speichern die Claude Code und Codex CLI Authentifizierung global,
+sodass du dich bei neuen Projekten nicht erneut anmelden musst.
+
+```bash
+docker volume create claude_auth
+docker volume create codex_auth
+```
+
+> Dieser Schritt ist nur beim allerersten Mal nötig. Bei weiteren Projekten
+> aus diesem Template sind die Volumes bereits vorhanden und die Anmeldung
+> bleibt erhalten.
+
+### 6. Docker Container starten
 
 ```bash
 docker-compose up -d
@@ -84,7 +99,7 @@ docker-compose up -d
 
 > Beim ersten Start wird der Container gebaut (~2-3 Minuten). Claude Code und Codex CLI werden automatisch installiert.
 
-### 6. Builder-Authentifizierung einrichten
+### 7. Builder-Authentifizierung einrichten
 
 Einmalig nach dem ersten Container-Start:
 
@@ -97,7 +112,7 @@ docker exec -it ai-factory-dev codex auth login
 # Alternativ: OPENAI_API_KEY in .env setzen
 ```
 
-### 7. Orchestrator ausführen
+### 8. Orchestrator ausführen
 
 ```bash
 # Alle offenen Tasks automatisch abarbeiten:
@@ -107,7 +122,7 @@ docker exec -it ai-factory-dev python run_graph.py
 docker exec -it ai-factory-dev python run_graph.py --task tasks/01_project_setup.md
 ```
 
-### 8. Ergebnisse prüfen
+### 9. Ergebnisse prüfen
 
 - **`reports/session-report.md`** — Was wurde gebaut, welche Dateien geändert, offene Punkte
 - **Git History** — Jede Task = 1 Commit, vollständige Nachvollziehbarkeit
@@ -197,7 +212,7 @@ A: Der Orchestrator versucht automatisch Codex CLI als Fallback (wenn `CODEX_ENA
 A: Nein. Claude Code authentifiziert sich via `claude login` (Claude.ai / Claude Pro Account). Kein API-Key nötig.
 
 **Q: Kann ich mehrere Projekte parallel betreiben?**  
-A: Ja — einfach das Template mehrfach klonen. Jedes Projekt ist ein eigenständiger Container.
+A: Ja — einfach das Template mehrfach klonen. Jedes Projekt ist ein eigenständiger Container mit eigenem `/workspace`. Die Claude Code und Codex CLI Authentifizierung wird automatisch über alle Projekte geteilt (via `claude_auth`- und `codex_auth`-Volumes).
 
 **Q: Wo finde ich den vollständigen Verlauf der Änderungen?**  
 A: In der Git-History (`git log`) und in `reports/session-report.md`.
