@@ -10,7 +10,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.ui
-    container_name: ai-factory-ui
     working_dir: /app
     ports:
       - "3000:3000"
@@ -19,14 +18,14 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock  # needed for docker exec bridge
     environment:
       - PROJECT_ROOT=/workspace
-      # Override the run command if not using docker exec:
-      # - RUN_COMMAND=python /workspace/run_graph.py
-      # - RUN_CONTAINER=ai-factory-dev
+      # Which dev container to exec into for "Start Run" button.
+      # Docker Compose names containers: <project>-<service>-<index>
+      # COMPOSE_PROJECT_NAME defaults to the directory name (set in .env to override).
+      - RUN_CONTAINER=${COMPOSE_PROJECT_NAME}-dev-1
     restart: unless-stopped
 
   dev:
     build: .
-    container_name: ai-factory-dev
     working_dir: /workspace
     volumes:
       - ./:/workspace
@@ -63,6 +62,4 @@ services:
 volumes:
   appuser_home:
   claude_auth:
-    external: true
   codex_auth:
-    external: true
