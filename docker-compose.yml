@@ -30,9 +30,11 @@ services:
     working_dir: /workspace
     volumes:
       - ./:/workspace
+      - appuser_home:/home/appuser
     stdin_open: true
     tty: true
     environment:
+      - HOME=/home/appuser
       # Gemini — role-specific models
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_ARCHITECT_MODEL=${GEMINI_ARCHITECT_MODEL:-gemini-2.5-pro}
@@ -55,3 +57,6 @@ services:
 
       # Workspace
       - PROJECT_ROOT=/workspace
+
+volumes:
+  appuser_home:

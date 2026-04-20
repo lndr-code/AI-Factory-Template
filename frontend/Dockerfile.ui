@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Install dependencies first (separate layer for cache efficiency)
 COPY ui/package*.json ./
-RUN npm ci
+RUN npm install
 
 # Build Vite + React → /app/dist/
 COPY ui/ ./

@@ -16,4 +16,5 @@ su -s /bin/bash appuser -c "
 "
 
 # Drop to appuser and exec the command (preserves signals, PID 1, etc.)
+export HOME=/home/appuser
 exec gosu appuser "$@"
