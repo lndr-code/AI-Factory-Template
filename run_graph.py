@@ -14,7 +14,7 @@ import argparse
 import os
 import glob
 
-from orchestrator.graph import app
+from orchestrator.external.runner import ExternalRunnerError, run_external_preflight
 
 PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.getcwd())
 TERMINAL_TASK_MARKERS = {
@@ -58,6 +58,8 @@ def run_task(task_file: str):
         }
         print(f"\n  Result: {result['final_report']}")
         return result
+    from orchestrator.graph import app
+
     result = app.invoke({"current_task_file": task_file})
     print(f"\n  Result: {result.get('final_report', 'No report generated.')}")
     return result
@@ -118,7 +120,47 @@ def main():
         help="Path to a specific task file relative to PROJECT_ROOT (e.g. tasks/01_setup.md). "
              "If not provided, all open tasks are run in sorted order.",
     )
+    parser.add_argument(
+        "--external-target",
+        type=str,
+        default=None,
+        help="Run External Mode preflight for a configured target (e.g. idp_pipeline).",
+    )
+    parser.add_argument(
+        "--target-root",
+        type=str,
+        default=None,
+        help="External target checkout path. Defaults to TARGET_ROOT or FACTORY_ROOT/external_targets/<target>.",
+    )
+    parser.add_argument(
+        "--factory-root",
+        type=str,
+        default=None,
+        help="AI Factory root. Defaults to FACTORY_ROOT or the current working directory.",
+    )
+    parser.add_argument(
+        "--external-preflight-only",
+        action="store_true",
+        help="Run only External Mode open-target and read-receipt checks. This is the only supported External Mode in v0 Durchlauf 2.",
+    )
     args = parser.parse_args()
+
+    if args.external_target:
+        try:
+            result = run_external_preflight(
+                target_name=args.external_target,
+                factory_root=args.factory_root,
+                target_root=args.target_root,
+            )
+        except ExternalRunnerError as e:
+            print(f"External preflight failed: {e}")
+            raise SystemExit(1) from e
+
+        print("External preflight complete.")
+        print(f"  Target:   {result['external_target']}")
+        print(f"  Run dir:  {result['run_dir']}")
+        print(f"  Receipt:  {result['read_receipt_path']}")
+        return
 
     if args.task:
         result = run_task(args.task)
@@ -133,6 +175,8 @@ def main():
 
         if not tasks:
             print("No open tasks found. Triggering architect flow...")
+            from orchestrator.graph import app
+
             result = app.invoke({"current_task_file": ""})
             answered = check_and_prompt_questions()
             if result.get("task_status") == "awaiting_input":

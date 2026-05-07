@@ -8,6 +8,8 @@ node_modules/
 .agent/planning_draft/
 reports/session-report.md
 reports/runs/
+runs/
+external_targets/
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
 .obsidian/plugins/
