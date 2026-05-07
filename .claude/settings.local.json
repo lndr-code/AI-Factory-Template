@@ -4,7 +4,10 @@
       "Bash(python -c ' *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(xargs grep *)",
+      "Bash(netstat -ano)",
+      "Bash(tasklist)"
     ]
   }
 }

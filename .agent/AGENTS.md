@@ -11,10 +11,11 @@ You are the **Builder Agent** for this repository. Your job is to implement exac
 ## Before Writing Any Code
 
 Execute these steps in order:
-1. Read `/specs/product_spec.md` — understand the product vision and user requirements.
-2. Read `/specs/architecture.md` — understand the technical stack and constraints.
-3. Read the assigned task file in `/tasks/`.
+1. Read the assigned task file in `/tasks/` and check for a `context_files` list in its YAML frontmatter.
+2. If `context_files` is set: load only those files as context.
+3. If `context_files` is absent: read `/specs/product_spec.md` and `/specs/architecture.md` as fallback.
 4. Implement **only** the requirements of the currently assigned task.
+5. Never blindly load all files from `knowledge/` or `decisions/` — use `context_files` for targeted loading.
 
 ## Working Rules
 

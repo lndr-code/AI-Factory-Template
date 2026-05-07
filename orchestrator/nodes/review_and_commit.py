@@ -43,9 +43,21 @@ def _run_validation() -> tuple[bool, str]:
         return False, f"Validation error: {e}"
 
 
-def _done_task_path(task_file: str) -> str:
-    base, ext = os.path.splitext(task_file)
-    return f"{base}.done{ext or '.md'}"
+def _patch_frontmatter_status(content: str, new_status: str) -> str:
+    """Set or add status field in YAML frontmatter without touching the rest."""
+    import re
+    if not content.startswith("---"):
+        return f"---\nstatus: {new_status}\n---\n{content}"
+    end = content.find("\n---", 3)
+    if end == -1:
+        return content
+    fm = content[3:end]
+    rest = content[end:]
+    if re.search(r"^status:", fm, re.MULTILINE):
+        fm = re.sub(r"^status:.*$", f"status: {new_status}", fm, flags=re.MULTILINE)
+    else:
+        fm = fm.rstrip("\n") + f"\nstatus: {new_status}\n"
+    return f"---{fm}{rest}"
 
 
 def review_and_commit(state: OrchestratorState) -> OrchestratorState:
@@ -95,15 +107,12 @@ def review_and_commit(state: OrchestratorState) -> OrchestratorState:
         if task_file and task_file != "unknown-task":
             full_path = os.path.join(PROJECT_ROOT, task_file)
             if os.path.exists(full_path) and ".done." not in task_file:
-                done_task_file = _done_task_path(task_file)
-                done_path = os.path.join(PROJECT_ROOT, done_task_file)
-                if os.path.exists(done_path):
-                    raise RuntimeError(f"Done task file already exists: {done_task_file}")
-                was_tracked = bool(run_git(["ls-files", "--", task_file], check=False).stdout.strip())
-                os.rename(full_path, done_path)
-                if was_tracked:
-                    stage_candidates.add(task_file)
-                stage_candidates.add(done_task_file.replace("\\", "/"))
+                with open(full_path, "r", encoding="utf-8") as f:
+                    task_content = f.read()
+                patched = _patch_frontmatter_status(task_content, "done")
+                with open(full_path, "w", encoding="utf-8") as f:
+                    f.write(patched)
+                stage_candidates.add(task_file.replace("\\", "/"))
 
         stage_paths(stage_candidates)
         assert_index_subset(stage_candidates)

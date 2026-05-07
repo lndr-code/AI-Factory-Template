@@ -6,4 +6,8 @@ __pycache__/
 !.env.example
 node_modules/
 .agent/planning_draft/
-reports/*.md
+reports/session-report.md
+reports/runs/
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/plugins/

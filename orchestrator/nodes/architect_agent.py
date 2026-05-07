@@ -13,6 +13,20 @@ _TEMPLATE_MARKERS = [
     "describe your product here",
 ]
 
+def _load_extra_context() -> str:
+    """Load knowledge/ and decisions/ overviews for the architect if they exist."""
+    sections = []
+    for rel in ("knowledge/glossary.md", "specs/architecture.md"):
+        path = os.path.join(PROJECT_ROOT, rel)
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+            if content:
+                sections.append(f"### {rel}\n{content}")
+    if not sections:
+        return ""
+    return "Additional project context:\n\n" + "\n\n".join(sections) + "\n\n"
+
 
 def _spec_is_template(content: str) -> bool:
     """Return True if the spec still contains placeholder text from the template."""
@@ -113,7 +127,9 @@ def architect_agent(state: OrchestratorState) -> OrchestratorState:
         if answered else ""
     )
 
-    prompt = f"""You are a Lead Architect. Read the following product_spec.md and produce:
+    extra_context = _load_extra_context()
+
+    prompt = f"""{extra_context}You are a Lead Architect. Read the following product_spec.md and produce:
 1. specs/architecture.md — tech stack, directory structure, data model, key decisions
 2. Numbered task files in tasks/ (e.g. tasks/01_setup.md, tasks/02_api.md)
    Each task must be:

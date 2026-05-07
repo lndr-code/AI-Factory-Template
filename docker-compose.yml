@@ -12,7 +12,7 @@ services:
       dockerfile: Dockerfile.ui
     working_dir: /app
     ports:
-      - "3000:3000"
+      - "${UI_PORT:-3000}:3000"
     volumes:
       - ./:/workspace                     # shared workspace with dev container
       - /var/run/docker.sock:/var/run/docker.sock  # needed for docker exec bridge

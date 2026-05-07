@@ -16,6 +16,50 @@ def _read_answered_questions() -> str:
         return f.read().strip()
 
 
+def _parse_context_files(content: str) -> list[str]:
+    """Extract the context_files list from YAML frontmatter."""
+    if not content.startswith("---"):
+        return []
+    end = content.find("\n---", 3)
+    if end == -1:
+        return []
+    fm = content[3:end]
+    in_context = False
+    files: list[str] = []
+    for line in fm.splitlines():
+        if line.strip().startswith("context_files:"):
+            in_context = True
+            continue
+        if in_context:
+            stripped = line.strip()
+            if stripped.startswith("-"):
+                files.append(stripped[1:].strip().strip("\"'"))
+            elif stripped and not stripped.startswith("#"):
+                break
+    return files
+
+
+def _load_context_files_for_task(task_file: str) -> str:
+    """Read context_files from task frontmatter and return their contents as a block."""
+    full_path = os.path.join(PROJECT_ROOT, task_file)
+    if not os.path.exists(full_path):
+        return ""
+    with open(full_path, "r", encoding="utf-8") as f:
+        task_content = f.read()
+    paths = _parse_context_files(task_content)
+    if not paths:
+        return ""
+    sections = []
+    for rel in paths:
+        abs_path = os.path.join(PROJECT_ROOT, rel)
+        if os.path.exists(abs_path):
+            with open(abs_path, "r", encoding="utf-8") as f:
+                sections.append(f"### {rel}\n{f.read().strip()}")
+    if not sections:
+        return ""
+    return "Context files specified in task:\n\n" + "\n\n".join(sections) + "\n\n"
+
+
 def build_with_claude(state: OrchestratorState) -> OrchestratorState:
     """
     Primary builder: invokes Claude Code CLI to implement the current task.
@@ -49,21 +93,29 @@ def build_with_claude(state: OrchestratorState) -> OrchestratorState:
             f"{retry_feedback}\n\n"
         )
 
-    # Issue 6: include answered questions as additional context
+    # include answered questions as additional context
     answered = _read_answered_questions()
     answered_section = (
         f"Context — previously answered clarifying questions:\n{answered}\n\n"
         if answered else ""
     )
 
+    # Load only context_files from task frontmatter; fall back to full specs/ dir instruction
+    context_section = _load_context_files_for_task(task_file)
+    if context_section:
+        specs_instruction = f"Loaded context files are provided above — use them as your primary reference.\n"
+    else:
+        specs_instruction = f"Before implementing, read {PROJECT_ROOT}/specs/ for architecture and requirements.\n"
+
     prompt = (
         f"{feedback_section}"
         f"{answered_section}"
+        f"{context_section}"
         f"You are the implementation agent for this repository.\n"
         f"Workspace: {PROJECT_ROOT}\n"
         f"Task file: {os.path.join(PROJECT_ROOT, task_file)}\n"
         f"\n"
-        f"Before implementing, read {PROJECT_ROOT}/specs/ for architecture and requirements.\n"
+        f"{specs_instruction}"
         f"\n"
         f"Rules:\n"
         f"- Implement only what the task describes — do not touch unrelated files\n"
