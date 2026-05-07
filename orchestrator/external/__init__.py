@@ -14,6 +14,11 @@ from orchestrator.external.builder import (
     run_external_builder,
     write_external_builder_report,
 )
+from orchestrator.external.finalize import (
+    ExternalFinalizeError,
+    finalize_external_patch,
+    write_external_finalizer_report,
+)
 from orchestrator.external.read_receipt import (
     ReadReceiptError,
     build_read_receipt,
@@ -33,6 +38,7 @@ __all__ = [
     "ExternalTargetConfig",
     "ExternalRunnerError",
     "ExternalBuilderError",
+    "ExternalFinalizeError",
     "ManifestError",
     "PlanningConfig",
     "ReadReceiptError",
@@ -41,6 +47,7 @@ __all__ = [
     "build_read_receipt",
     "build_external_prompt",
     "find_deny_glob_matches",
+    "finalize_external_patch",
     "load_external_target",
     "resolve_factory_root",
     "resolve_target_root",
@@ -48,4 +55,5 @@ __all__ = [
     "run_external_builder",
     "write_read_receipt",
     "write_external_builder_report",
+    "write_external_finalizer_report",
 ]

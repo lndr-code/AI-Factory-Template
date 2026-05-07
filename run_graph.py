@@ -15,6 +15,7 @@ import os
 import glob
 
 from orchestrator.external.builder import ExternalBuilderError, run_external_builder
+from orchestrator.external.finalize import ExternalFinalizeError, finalize_external_patch
 from orchestrator.external.runner import ExternalRunnerError, run_external_preflight
 
 PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.getcwd())
@@ -155,10 +156,17 @@ def main():
         default=None,
         help="Override the manifest primary builder for External Mode builds.",
     )
+    parser.add_argument(
+        "--external-finalize",
+        action="store_true",
+        help="After External Mode build, validate TARGET_ROOT and write run_dir/changes.patch.",
+    )
     args = parser.parse_args()
 
     if args.external_target:
         try:
+            if args.external_finalize and not args.external_build:
+                raise ExternalFinalizeError("--external-finalize requires --external-build")
             result = run_external_preflight(
                 target_name=args.external_target,
                 factory_root=args.factory_root,
@@ -172,26 +180,38 @@ def main():
                     task_file=args.task,
                     builder=args.external_builder,
                 )
+                if args.external_finalize:
+                    result = finalize_external_patch(result)
         except ExternalRunnerError as e:
             print(f"External preflight failed: {e}")
             raise SystemExit(1) from e
         except ExternalBuilderError as e:
             print(f"External builder failed: {e}")
             raise SystemExit(1) from e
+        except ExternalFinalizeError as e:
+            print(f"External finalizer failed: {e}")
+            raise SystemExit(1) from e
 
         if args.external_build:
             print("External build complete.")
             print(f"  Builder:  {result['external_builder']}")
             print(f"  Status:   {result['builder_status']}")
+            if args.external_finalize:
+                print(f"  Validation: {result.get('validation_status', 'unknown')}")
+                print(f"  Patch:    {result.get('patch_status', 'unknown')}")
+                if result.get("changes_patch_path"):
+                    print(f"  Changes:  {result['changes_patch_path']}")
             if result.get("policy_violation"):
                 print(f"  Policy:   {result['policy_violation']}")
-            print(f"  Report:   {result['external_builder_report_path']}")
+            print(f"  Report:   {result.get('external_finalizer_report_path', result.get('external_builder_report_path'))}")
         else:
             print("External preflight complete.")
         print(f"  Target:   {result['external_target']}")
         print(f"  Run dir:  {result['run_dir']}")
         print(f"  Receipt:  {result['read_receipt_path']}")
         if result.get("builder_status") in {"failed", "policy_violation"}:
+            raise SystemExit(1)
+        if result.get("validation_status") == "failed" or result.get("patch_status") in {"failed", "no_changes", "policy_violation"}:
             raise SystemExit(1)
         return
 
