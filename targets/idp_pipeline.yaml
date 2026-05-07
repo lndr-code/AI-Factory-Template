@@ -1,0 +1,62 @@
+# AI-Factory-Manifest für lndr-code/idp_pipeline
+# Diese Datei lebt im AI-Factory-Repo, NICHT im IDP-Repo.
+
+repo: git@github.com:lndr-code/idp_pipeline.git
+base_branch: develop
+protected_branches:
+  - main
+
+required_read_files:
+  - CLAUDE.md
+  - AGENTS.md
+  - docs/architecture/current_mvp.md
+
+planning:
+  architect_phase: disabled
+
+task_sources:
+  - factory_task_file
+
+validation:
+  command: pytest tests/test_smoke.py -v
+  mode: local
+  timeout_seconds: 300
+
+builders:
+  primary: claude
+  fallback: null
+
+commit:
+  enabled_from_version: v1
+  branch_strategy: agent_branch
+  branch_prefixes:
+    - feature/agent-
+    - fix/agent-
+    - chore/agent-
+    - test/agent-
+    - docs/agent-
+  message_prefix_from_task: true
+  push_enabled_from_version: v1
+  pr_enabled_from_version: v2
+
+security:
+  deny_globs:
+    - .env
+    - .env.*
+    - data/**
+    - input_pdfs/**
+    - output/**
+    - archive/**
+    - Testdaten/**
+    - logs/**
+    - "**/*.pdf"
+  abort_if_deny_glob_present: true
+  protected_paths_in_diff:
+    - .github/workflows/**
+    - .devcontainer/**
+    - AGENTS.md
+    - CLAUDE.md
+    - docs/architecture/current_mvp.md
+  log_redaction:
+    drop_fields: [stdout, stderr]
+    keep_fields: [exit_code, changed_files, duration_seconds, error_summary]
