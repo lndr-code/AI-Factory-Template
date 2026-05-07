@@ -132,11 +132,14 @@ Diese Korrektur übernimmt diese ADR (siehe v0 unten).
 4. **Commit-Typ ableiten, nicht hartkodieren.** Bereits in v1 wird der
    Commit-Präfix (`feat`/`fix`/`chore`/`test`/`docs`) aus einem Pflichtfeld
    in der Task-Datei gelesen, nicht aus `feat: complete` zusammengebaut.
-5. **Codex-CLI versionieren oder deaktivieren.** Solange der Codex-Adapter
-   im Template auf `--approval-mode full-auto` steht, bleibt Codex im
-   External-Mode für IDP standardmäßig **aus** (`builders.fallback: null`).
-   Aktivierung erst nach Anpassung des Codex-Adapters auf die aktuelle
-   CLI (`--full-auto`) und einer Smoke-Test-Verifizierung.
+5. **Codex-CLI versionieren und als wählbaren Builder aktivieren.** Der
+   alte Template-Adapter mit `--approval-mode full-auto` bleibt für den
+   In-Repo-Modus unberührt, aber der External-Mode nutzt ab Durchlauf 3
+   den modernen nicht-interaktiven Pfad `codex exec` mit
+   `--sandbox workspace-write`, `--ask-for-approval never`, `--cd
+   TARGET_ROOT` und `--add-dir RUN_DIR`. Damit kann Codex die
+   Claude-Session-Limits abfedern, ohne den External-Mode mit
+   `danger-full-access` zu öffnen.
 6. **Pflichtlektüre nicht nur lesen, sondern als Prompt-Block einspeisen.**
    Der Builder-Prompt im External-Mode ersetzt den `/specs/`-Verweis durch:
    "Lies und befolge zwingend `CLAUDE.md`, `AGENTS.md`,
@@ -216,7 +219,8 @@ bearbeiten und liefert einen Patch zurück. Mensch reviewt und committet.
 - Keine GitHub-Issue-Integration.
 - Keine Devcontainer-basierte Validation (lokale `pytest`-Ausführung).
 - Kein Sparse-Checkout, kein gefilterter Workspace.
-- Kein Codex-Fallback (`builders.fallback: null`).
+- Codex ist ab Durchlauf 3 als wählbarer External Builder erlaubt; der
+  alte In-Repo-Codex-Adapter bleibt davon getrennt.
 - Keine Read-Receipt-Verifikation als Hash-Echo durch den Builder
   (kommt in v1).
 
@@ -326,8 +330,8 @@ validation:
   timeout_seconds: 300
 
 builders:
-  primary: claude
-  fallback: null                    # Codex bleibt aus, bis Adapter aktualisiert
+  primary: codex                    # v0 Durchlauf 3: Codex ist First-Class Builder
+  fallback: claude                  # optionaler manueller Ausweich-Builder
 
 commit:
   enabled_from_version: v1          # v0: kein Commit, nur Patch-Artefakt

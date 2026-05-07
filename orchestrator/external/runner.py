@@ -62,6 +62,8 @@ def run_external_preflight(
         "required_read_hashes": hashes,
         "validation_command": manifest.validation.command,
         "validation_timeout_seconds": manifest.validation.timeout_seconds,
+        "external_builder_primary": manifest.builders.primary,
+        "external_builder_fallback": manifest.builders.fallback,
         "deny_globs": list(manifest.security.deny_globs),
         "protected_paths_in_diff": list(manifest.security.protected_paths_in_diff),
         "read_receipt_path": _slash_path(receipt_path),

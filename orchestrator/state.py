@@ -46,5 +46,7 @@ class OrchestratorState(TypedDict, total=False):
     required_read_hashes: dict[str, str]
     validation_command: str
     validation_timeout_seconds: int
+    external_builder_primary: str
+    external_builder_fallback: Optional[str]
     deny_globs: list[str]
     protected_paths_in_diff: list[str]

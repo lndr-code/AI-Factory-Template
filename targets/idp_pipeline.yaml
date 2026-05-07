@@ -23,8 +23,8 @@ validation:
   timeout_seconds: 300
 
 builders:
-  primary: claude
-  fallback: null
+  primary: codex
+  fallback: claude
 
 commit:
   enabled_from_version: v1

@@ -24,8 +24,8 @@ validation:
   mode: local
   timeout_seconds: 300
 builders:
-  primary: claude
-  fallback: null
+  primary: codex
+  fallback: claude
 commit:
   enabled_from_version: v1
   branch_strategy: agent_branch
@@ -55,8 +55,8 @@ class ExternalManifestTests(unittest.TestCase):
         self.assertEqual(config.name, "idp_pipeline")
         self.assertEqual(config.repo, "git@github.com:lndr-code/idp_pipeline.git")
         self.assertEqual(config.planning.architect_phase, "disabled")
-        self.assertEqual(config.builders.primary, "claude")
-        self.assertIsNone(config.builders.fallback)
+        self.assertEqual(config.builders.primary, "codex")
+        self.assertEqual(config.builders.fallback, "claude")
         self.assertEqual(config.required_read_files[-1], "docs/architecture/current_mvp.md")
         self.assertEqual(config.security.deny_globs[-1], "data/**")
 
@@ -72,14 +72,35 @@ class ExternalManifestTests(unittest.TestCase):
             with self.assertRaisesRegex(ManifestError, "planning\\.architect_phase"):
                 load_external_target("idp_pipeline", factory_root=str(root))
 
-    def test_primary_builder_must_be_claude(self) -> None:
-        manifest = VALID_MANIFEST.replace("primary: claude", "primary: codex")
+    def test_primary_builder_may_be_claude(self) -> None:
+        manifest = VALID_MANIFEST.replace("primary: codex", "primary: claude").replace("fallback: claude", "fallback: codex")
+        with manifest_root(manifest) as root:
+            config = load_external_target("idp_pipeline", factory_root=str(root))
+
+        self.assertEqual(config.builders.primary, "claude")
+        self.assertEqual(config.builders.fallback, "codex")
+
+    def test_fallback_builder_may_be_null(self) -> None:
+        manifest = VALID_MANIFEST.replace("fallback: claude", "fallback: null")
+        with manifest_root(manifest) as root:
+            config = load_external_target("idp_pipeline", factory_root=str(root))
+
+        self.assertIsNone(config.builders.fallback)
+
+    def test_unknown_primary_builder_fails(self) -> None:
+        manifest = VALID_MANIFEST.replace("primary: codex", "primary: other")
         with manifest_root(manifest) as root:
             with self.assertRaisesRegex(ManifestError, "builders\\.primary"):
                 load_external_target("idp_pipeline", factory_root=str(root))
 
-    def test_fallback_builder_must_be_null(self) -> None:
-        manifest = VALID_MANIFEST.replace("fallback: null", "fallback: codex")
+    def test_unknown_fallback_builder_fails(self) -> None:
+        manifest = VALID_MANIFEST.replace("fallback: claude", "fallback: other")
+        with manifest_root(manifest) as root:
+            with self.assertRaisesRegex(ManifestError, "builders\\.fallback"):
+                load_external_target("idp_pipeline", factory_root=str(root))
+
+    def test_fallback_builder_must_differ_from_primary(self) -> None:
+        manifest = VALID_MANIFEST.replace("fallback: claude", "fallback: codex")
         with manifest_root(manifest) as root:
             with self.assertRaisesRegex(ManifestError, "builders\\.fallback"):
                 load_external_target("idp_pipeline", factory_root=str(root))

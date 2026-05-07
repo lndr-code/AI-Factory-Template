@@ -6,6 +6,8 @@ from typing import Any
 
 import yaml
 
+SUPPORTED_EXTERNAL_BUILDERS = frozenset({"claude", "codex"})
+
 
 class ManifestError(ValueError):
     """Raised when an external target manifest is missing or invalid."""
@@ -149,14 +151,20 @@ def _load_validation(raw: Any) -> ValidationConfig:
 def _load_builders(raw: Any) -> BuilderConfig:
     data = _mapping(raw, "builders")
     primary = _non_empty_string(data, "primary", prefix="builders")
-    if primary != "claude":
-        raise ManifestError("builders.primary must be 'claude' for External Mode v0")
+    if primary not in SUPPORTED_EXTERNAL_BUILDERS:
+        raise ManifestError("builders.primary must be one of: claude, codex")
     if "fallback" not in data:
         raise ManifestError("Missing required manifest field: builders.fallback")
     fallback = data["fallback"]
     if fallback is not None:
-        raise ManifestError("builders.fallback must be null for External Mode v0")
-    return BuilderConfig(primary=primary, fallback=None)
+        if not isinstance(fallback, str) or not fallback.strip():
+            raise ManifestError("builders.fallback must be a builder name or null")
+        fallback = fallback.strip()
+        if fallback not in SUPPORTED_EXTERNAL_BUILDERS:
+            raise ManifestError("builders.fallback must be one of: claude, codex, null")
+        if fallback == primary:
+            raise ManifestError("builders.fallback must differ from builders.primary")
+    return BuilderConfig(primary=primary, fallback=fallback)
 
 
 def _load_commit(raw: Any) -> CommitConfig:

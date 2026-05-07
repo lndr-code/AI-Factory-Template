@@ -14,6 +14,7 @@ import argparse
 import os
 import glob
 
+from orchestrator.external.builder import ExternalBuilderError, run_external_builder
 from orchestrator.external.runner import ExternalRunnerError, run_external_preflight
 
 PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.getcwd())
@@ -141,7 +142,18 @@ def main():
     parser.add_argument(
         "--external-preflight-only",
         action="store_true",
-        help="Run only External Mode open-target and read-receipt checks. This is the only supported External Mode in v0 Durchlauf 2.",
+        help="Run only External Mode open-target and read-receipt checks.",
+    )
+    parser.add_argument(
+        "--external-build",
+        action="store_true",
+        help="After External Mode preflight, run the configured external builder and then stop before review/validation/patch.",
+    )
+    parser.add_argument(
+        "--external-builder",
+        choices=("claude", "codex"),
+        default=None,
+        help="Override the manifest primary builder for External Mode builds.",
     )
     args = parser.parse_args()
 
@@ -152,14 +164,35 @@ def main():
                 factory_root=args.factory_root,
                 target_root=args.target_root,
             )
+            if args.external_build:
+                if not args.task:
+                    raise ExternalBuilderError("--external-build requires --task")
+                result = run_external_builder(
+                    result,
+                    task_file=args.task,
+                    builder=args.external_builder,
+                )
         except ExternalRunnerError as e:
             print(f"External preflight failed: {e}")
             raise SystemExit(1) from e
+        except ExternalBuilderError as e:
+            print(f"External builder failed: {e}")
+            raise SystemExit(1) from e
 
-        print("External preflight complete.")
+        if args.external_build:
+            print("External build complete.")
+            print(f"  Builder:  {result['external_builder']}")
+            print(f"  Status:   {result['builder_status']}")
+            if result.get("policy_violation"):
+                print(f"  Policy:   {result['policy_violation']}")
+            print(f"  Report:   {result['external_builder_report_path']}")
+        else:
+            print("External preflight complete.")
         print(f"  Target:   {result['external_target']}")
         print(f"  Run dir:  {result['run_dir']}")
         print(f"  Receipt:  {result['read_receipt_path']}")
+        if result.get("builder_status") in {"failed", "policy_violation"}:
+            raise SystemExit(1)
         return
 
     if args.task:
