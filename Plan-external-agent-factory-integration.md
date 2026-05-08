@@ -239,6 +239,25 @@ bearbeiten und liefert einen Patch zurück. Mensch reviewt und committet.
 | A0.9 | `_SYSTEM_PROTECTED` aus Reviewer ist im External-Mode aus dem Manifest geladen, nicht aus `review_with_gemini.py` hartkodiert |
 | A0.10 | Bestehender In-Repo-Modus der Factory funktioniert weiterhin gegen ein anderes Test-Repo (Regression) |
 
+### v0-Abnahmestatus nach Durchlauf 5
+
+Die automatische Abnahme nutzt synthetische temporäre Git-Repos und gemockte
+Builder. Ein Real-IDP-Smoke gegen `lndr-code/idp_pipeline` bleibt optional
+und ist nicht Teil der reproduzierbaren Tests.
+
+| ID | Testabdeckung | Status |
+| --- | --- | --- |
+| A0.1 | `ExternalV0AcceptanceTests.test_a01_manifest_exists_and_loads` | erfüllt |
+| A0.2 | `test_a02_a03_a04_a07_full_flow_creates_patch_without_target_artifacts` | erfüllt (synthetisches Target) |
+| A0.3 | `test_a02_a03_a04_a07_full_flow_creates_patch_without_target_artifacts` | erfüllt |
+| A0.4 | `test_a02_a03_a04_a07_full_flow_creates_patch_without_target_artifacts`, `test_a04_validation_failure_blocks_patch` | erfüllt |
+| A0.5 | `test_a05_required_read_change_blocks_patch` | erfüllt |
+| A0.6 | `test_a06_deny_glob_blocks_preflight` | erfüllt |
+| A0.7 | `test_a02_a03_a04_a07_full_flow_creates_patch_without_target_artifacts` | erfüllt |
+| A0.8 | `test_a08_builder_commit_is_policy_violation` | erfüllt |
+| A0.9 | `test_a09_external_uses_manifest_policy_without_gemini_reviewer` | erfüllt für External-v0 ohne Gemini-Reviewer |
+| A0.10 | `RunGraphRegressionTests` | erfüllt |
+
 ### v1 — Agent-Branch und Push
 
 **Neu in v1:**

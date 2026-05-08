@@ -36,6 +36,7 @@ def run_external_preflight(
         raise ExternalRunnerError(
             "Target contains files blocked by deny_globs: " + ", ".join(deny_matches)
         )
+    ensure_target_clean(resolved_target_root)
 
     hashes = build_read_receipt(
         resolved_target_root,
@@ -114,6 +115,8 @@ def open_target_repo(
     if active_branch in manifest.protected_branches:
         raise ExternalRunnerError(f"Refusing to operate on protected branch: {active_branch}")
 
+
+def ensure_target_clean(target_root: str) -> None:
     status = _run_git(["status", "--porcelain"], cwd=target_root).stdout.strip()
     if status:
         raise ExternalRunnerError("TARGET_ROOT must be clean before External Mode preflight")
@@ -143,7 +146,7 @@ def find_deny_glob_matches(
 
 
 def make_run_id(target_name: str) -> str:
-    timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     return f"{timestamp}-{target_name}"
 
 

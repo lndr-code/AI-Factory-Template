@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import subprocess
 
+from orchestrator.external.read_receipt import ReadReceiptError, verify_read_receipt
+
 
 FACTORY_ARTIFACT_ROOTS = ("reports", "tasks", "specs", "questions")
 
@@ -32,6 +34,30 @@ def finalize_external_patch(state: dict[str, object]) -> dict[str, object]:
     validation_command = _required_string(state, "validation_command")
     validation_timeout = _required_int(state, "validation_timeout_seconds")
     os.makedirs(run_dir, exist_ok=True)
+
+    expected_hashes = state.get("required_read_hashes", {})
+    if not isinstance(expected_hashes, dict):
+        raise ExternalFinalizeError("External finalizer state requires required_read_hashes")
+    try:
+        verify_read_receipt(
+            target_root,
+            {str(path): str(digest) for path, digest in expected_hashes.items()},
+        )
+    except ReadReceiptError as e:
+        result_state.update(
+            {
+                "finalize_status": "policy_violation",
+                "validation_status": "skipped",
+                "patch_status": "skipped",
+                "task_status": "failed",
+                "policy_violation": "required_read_changed",
+                "last_error": str(e),
+            }
+        )
+        result_state["external_finalizer_report_path"] = _slash_path(
+            write_external_finalizer_report(result_state)
+        )
+        return result_state
 
     validation_passed, validation_output = _run_validation(
         command=validation_command,

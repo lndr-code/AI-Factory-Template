@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from orchestrator.external.finalize import finalize_external_patch
+from orchestrator.external.read_receipt import build_read_receipt
 
 
 class ExternalFinalizeTests(unittest.TestCase):
@@ -137,6 +138,10 @@ class finalize_fixture:
             "run_dir": str(self.run_dir),
             "validation_command": self.validation_command,
             "validation_timeout_seconds": 10,
+            "required_read_hashes": build_read_receipt(
+                str(self.target_root),
+                ("CLAUDE.md", "AGENTS.md", "docs/architecture/current_mvp.md"),
+            ),
         }
         return self
 
@@ -153,6 +158,10 @@ def _fail_apply_check_once(args, cwd, check=True):
 
 def _create_git_repo(path: Path) -> None:
     _run(["git", "init", "-b", "develop"], cwd=path)
+    (path / "docs" / "architecture").mkdir(parents=True)
+    (path / "CLAUDE.md").write_text("claude\n", encoding="utf-8")
+    (path / "AGENTS.md").write_text("agents\n", encoding="utf-8")
+    (path / "docs" / "architecture" / "current_mvp.md").write_text("mvp\n", encoding="utf-8")
     (path / "README.md").write_text("target\n", encoding="utf-8")
     _run(["git", "add", "."], cwd=path)
     _run(

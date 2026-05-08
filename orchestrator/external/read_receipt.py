@@ -43,6 +43,26 @@ def write_read_receipt(
     return path
 
 
+def verify_read_receipt(
+    target_root: str,
+    expected_hashes: dict[str, str],
+) -> None:
+    """Raise if any required-read file is missing or no longer matches."""
+    current_hashes = build_read_receipt(
+        target_root,
+        tuple(expected_hashes.keys()),
+    )
+    mismatches = [
+        path
+        for path, expected in expected_hashes.items()
+        if current_hashes.get(path) != expected
+    ]
+    if mismatches:
+        raise ReadReceiptError(
+            "Required-read files changed since preflight: " + ", ".join(sorted(mismatches))
+        )
+
+
 def _sha256_file(path: str) -> str:
     digest = hashlib.sha256()
     with open(path, "rb") as f:

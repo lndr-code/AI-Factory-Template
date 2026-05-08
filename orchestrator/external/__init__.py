@@ -22,6 +22,7 @@ from orchestrator.external.finalize import (
 from orchestrator.external.read_receipt import (
     ReadReceiptError,
     build_read_receipt,
+    verify_read_receipt,
     write_read_receipt,
 )
 from orchestrator.external.runner import (
@@ -53,6 +54,7 @@ __all__ = [
     "resolve_target_root",
     "run_external_preflight",
     "run_external_builder",
+    "verify_read_receipt",
     "write_read_receipt",
     "write_external_builder_report",
     "write_external_finalizer_report",

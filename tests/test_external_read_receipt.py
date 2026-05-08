@@ -7,6 +7,7 @@ from pathlib import Path
 from orchestrator.external.read_receipt import (
     ReadReceiptError,
     build_read_receipt,
+    verify_read_receipt,
     write_read_receipt,
 )
 
@@ -37,6 +38,16 @@ class ReadReceiptTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(ReadReceiptError, "Required-read file not found"):
                 build_read_receipt(tmp, ("AGENTS.md",))
+
+    def test_verify_read_receipt_detects_changed_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "AGENTS.md").write_bytes(b"before\n")
+            receipt = build_read_receipt(str(root), ("AGENTS.md",))
+            (root / "AGENTS.md").write_bytes(b"after\n")
+
+            with self.assertRaisesRegex(ReadReceiptError, "changed since preflight"):
+                verify_read_receipt(str(root), receipt)
 
     def test_write_read_receipt_creates_json_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
