@@ -36,3 +36,17 @@ class OrchestratorState(TypedDict, total=False):
     unsafe_changed_files: list[str]
     planning_files: list[str]
     policy_violation: str
+    external_mode: bool
+    external_target: str
+    factory_root: str
+    target_root: str
+    run_id: str
+    run_dir: str
+    manifest_path: str
+    required_read_hashes: dict[str, str]
+    validation_command: str
+    validation_timeout_seconds: int
+    external_builder_primary: str
+    external_builder_fallback: Optional[str]
+    deny_globs: list[str]
+    protected_paths_in_diff: list[str]

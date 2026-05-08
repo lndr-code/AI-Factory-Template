@@ -1,6 +1,8 @@
 __pycache__/
 *.py[cod]
 *.pyo
+.pytest_cache/
+pytest-cache-files-*/
 .env
 .env.*
 !.env.example
@@ -8,6 +10,11 @@ node_modules/
 .agent/planning_draft/
 reports/session-report.md
 reports/runs/
+runs/
+external_targets/
+factory_tasks/
+*.patch
+*.log
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
 .obsidian/plugins/

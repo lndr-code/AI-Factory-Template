@@ -14,7 +14,9 @@ import argparse
 import os
 import glob
 
-from orchestrator.graph import app
+from orchestrator.external.builder import ExternalBuilderError, run_external_builder
+from orchestrator.external.finalize import ExternalFinalizeError, finalize_external_patch
+from orchestrator.external.runner import ExternalRunnerError, run_external_preflight
 
 PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.getcwd())
 TERMINAL_TASK_MARKERS = {
@@ -58,6 +60,8 @@ def run_task(task_file: str):
         }
         print(f"\n  Result: {result['final_report']}")
         return result
+    from orchestrator.graph import app
+
     result = app.invoke({"current_task_file": task_file})
     print(f"\n  Result: {result.get('final_report', 'No report generated.')}")
     return result
@@ -118,7 +122,98 @@ def main():
         help="Path to a specific task file relative to PROJECT_ROOT (e.g. tasks/01_setup.md). "
              "If not provided, all open tasks are run in sorted order.",
     )
+    parser.add_argument(
+        "--external-target",
+        type=str,
+        default=None,
+        help="Run External Mode preflight for a configured target (e.g. my-project).",
+    )
+    parser.add_argument(
+        "--target-root",
+        type=str,
+        default=None,
+        help="External target checkout path. Defaults to TARGET_ROOT or FACTORY_ROOT/external_targets/<target>.",
+    )
+    parser.add_argument(
+        "--factory-root",
+        type=str,
+        default=None,
+        help="AI Factory root. Defaults to FACTORY_ROOT or the current working directory.",
+    )
+    parser.add_argument(
+        "--external-preflight-only",
+        action="store_true",
+        help="Run only External Mode open-target and read-receipt checks.",
+    )
+    parser.add_argument(
+        "--external-build",
+        action="store_true",
+        help="After External Mode preflight, run the configured external builder and then stop before review/validation/patch.",
+    )
+    parser.add_argument(
+        "--external-builder",
+        choices=("claude", "codex"),
+        default=None,
+        help="Override the manifest primary builder for External Mode builds.",
+    )
+    parser.add_argument(
+        "--external-finalize",
+        action="store_true",
+        help="After External Mode build, validate TARGET_ROOT and write run_dir/changes.patch.",
+    )
     args = parser.parse_args()
+
+    if args.external_target:
+        try:
+            if args.external_finalize and not args.external_build:
+                raise ExternalFinalizeError("--external-finalize requires --external-build")
+            result = run_external_preflight(
+                target_name=args.external_target,
+                factory_root=args.factory_root,
+                target_root=args.target_root,
+            )
+            if args.external_build:
+                if not args.task:
+                    raise ExternalBuilderError("--external-build requires --task")
+                result = run_external_builder(
+                    result,
+                    task_file=args.task,
+                    builder=args.external_builder,
+                )
+                if args.external_finalize:
+                    result = finalize_external_patch(result)
+        except ExternalRunnerError as e:
+            print(f"External preflight failed: {e}")
+            raise SystemExit(1) from e
+        except ExternalBuilderError as e:
+            print(f"External builder failed: {e}")
+            raise SystemExit(1) from e
+        except ExternalFinalizeError as e:
+            print(f"External finalizer failed: {e}")
+            raise SystemExit(1) from e
+
+        if args.external_build:
+            print("External build complete.")
+            print(f"  Builder:  {result['external_builder']}")
+            print(f"  Status:   {result['builder_status']}")
+            if args.external_finalize:
+                print(f"  Validation: {result.get('validation_status', 'unknown')}")
+                print(f"  Patch:    {result.get('patch_status', 'unknown')}")
+                if result.get("changes_patch_path"):
+                    print(f"  Changes:  {result['changes_patch_path']}")
+            if result.get("policy_violation"):
+                print(f"  Policy:   {result['policy_violation']}")
+            print(f"  Report:   {result.get('external_finalizer_report_path', result.get('external_builder_report_path'))}")
+        else:
+            print("External preflight complete.")
+        print(f"  Target:   {result['external_target']}")
+        print(f"  Run dir:  {result['run_dir']}")
+        print(f"  Receipt:  {result['read_receipt_path']}")
+        if result.get("builder_status") in {"failed", "policy_violation"}:
+            raise SystemExit(1)
+        if result.get("validation_status") == "failed" or result.get("patch_status") in {"failed", "no_changes", "policy_violation"}:
+            raise SystemExit(1)
+        return
 
     if args.task:
         result = run_task(args.task)
@@ -133,6 +228,8 @@ def main():
 
         if not tasks:
             print("No open tasks found. Triggering architect flow...")
+            from orchestrator.graph import app
+
             result = app.invoke({"current_task_file": ""})
             answered = check_and_prompt_questions()
             if result.get("task_status") == "awaiting_input":
