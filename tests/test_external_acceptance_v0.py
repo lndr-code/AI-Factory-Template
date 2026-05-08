@@ -14,16 +14,16 @@ from orchestrator.external.runner import ExternalRunnerError, run_external_prefl
 
 class ExternalV0AcceptanceTests(unittest.TestCase):
     def test_a01_manifest_exists_and_loads(self) -> None:
-        config = load_external_target("idp_pipeline", factory_root=str(REPO_ROOT))
+        config = load_external_target("example", factory_root=str(REPO_ROOT))
 
-        self.assertEqual(config.base_branch, "develop")
-        self.assertEqual(config.validation.command, "pytest tests/test_smoke.py -v")
-        self.assertEqual(config.builders.primary, "codex")
+        self.assertEqual(config.base_branch, "main")
+        self.assertEqual(config.validation.command, "pytest tests/ -v")
+        self.assertEqual(config.builders.primary, "claude")
 
     def test_a02_a03_a04_a07_full_flow_creates_patch_without_target_artifacts(self) -> None:
         with acceptance_fixture() as fx:
             state = run_external_preflight(
-                "idp_pipeline",
+                "example",
                 factory_root=str(fx.factory_root),
                 target_root=str(fx.target_root),
             )
@@ -51,7 +51,7 @@ class ExternalV0AcceptanceTests(unittest.TestCase):
     def test_a04_validation_failure_blocks_patch(self) -> None:
         with acceptance_fixture(validation_command=_python_command("raise SystemExit(2)")) as fx:
             state = run_external_preflight(
-                "idp_pipeline",
+                "example",
                 factory_root=str(fx.factory_root),
                 target_root=str(fx.target_root),
             )
@@ -65,7 +65,7 @@ class ExternalV0AcceptanceTests(unittest.TestCase):
     def test_a05_required_read_change_blocks_patch(self) -> None:
         with acceptance_fixture() as fx:
             state = run_external_preflight(
-                "idp_pipeline",
+                "example",
                 factory_root=str(fx.factory_root),
                 target_root=str(fx.target_root),
             )
@@ -84,7 +84,7 @@ class ExternalV0AcceptanceTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ExternalRunnerError, "deny_globs"):
                 run_external_preflight(
-                    "idp_pipeline",
+                    "example",
                     factory_root=str(fx.factory_root),
                     target_root=str(fx.target_root),
                 )
@@ -92,7 +92,7 @@ class ExternalV0AcceptanceTests(unittest.TestCase):
     def test_a08_builder_commit_is_policy_violation(self) -> None:
         with acceptance_fixture() as fx:
             state = run_external_preflight(
-                "idp_pipeline",
+                "example",
                 factory_root=str(fx.factory_root),
                 target_root=str(fx.target_root),
             )
@@ -105,7 +105,7 @@ class ExternalV0AcceptanceTests(unittest.TestCase):
     def test_a09_external_uses_manifest_policy_without_gemini_reviewer(self) -> None:
         with acceptance_fixture() as fx:
             state = run_external_preflight(
-                "idp_pipeline",
+                "example",
                 factory_root=str(fx.factory_root),
                 target_root=str(fx.target_root),
             )
@@ -116,7 +116,7 @@ class ExternalV0AcceptanceTests(unittest.TestCase):
         with acceptance_fixture() as fx:
             original_task = fx.task_path.read_text(encoding="utf-8")
             state = run_external_preflight(
-                "idp_pipeline",
+                "example",
                 factory_root=str(fx.factory_root),
                 target_root=str(fx.target_root),
             )
@@ -137,7 +137,7 @@ class acceptance_fixture:
         self.root = Path(self._tmp.name)
         self.factory_root = self.root / "factory"
         self.target_root = self.root / "target"
-        self.task_path = self.factory_root / "factory_tasks" / "idp_pipeline" / "001_task.md"
+        self.task_path = self.factory_root / "factory_tasks" / "example" / "001_task.md"
         self.factory_root.mkdir()
         self.task_path.parent.mkdir(parents=True)
         self.task_path.write_text("Change pipeline.py.\n", encoding="utf-8")
@@ -235,7 +235,7 @@ def _create_target_repo(path: Path) -> None:
 def _write_manifest(factory_root: Path, validation_command: str) -> None:
     targets = factory_root / "targets"
     targets.mkdir()
-    (targets / "idp_pipeline.yaml").write_text(
+    (targets / "example.yaml").write_text(
         textwrap.dedent(
             f"""
             repo: unused

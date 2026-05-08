@@ -91,7 +91,7 @@ class ExternalFinalizeTests(unittest.TestCase):
 
             self.assertEqual(result["validation_status"], "passed")
             self.assertEqual(result["patch_status"], "policy_violation")
-            self.assertEqual(result["policy_violation"], "idp_artifact_in_patch")
+            self.assertEqual(result["policy_violation"], "external_artifact_in_patch")
             self.assertFalse((fx.run_dir / "changes.patch").exists())
 
     def test_non_successful_builder_status_skips_finalizer(self) -> None:
@@ -130,7 +130,7 @@ class finalize_fixture:
         _create_git_repo(self.target_root)
         self.state = {
             "external_mode": True,
-            "external_target": "idp_pipeline",
+            "external_target": "example",
             "external_builder": "codex",
             "builder_status": "success",
             "build_status": "success",

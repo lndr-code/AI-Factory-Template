@@ -54,13 +54,13 @@ class ReadReceiptTests(unittest.TestCase):
             path = write_read_receipt(
                 tmp,
                 {
-                    "target": "idp_pipeline",
+                    "target": "example",
                     "required_read_hashes": {"AGENTS.md": "abc"},
                 },
             )
             data = json.loads(Path(path).read_text(encoding="utf-8"))
 
-        self.assertEqual(data["target"], "idp_pipeline")
+        self.assertEqual(data["target"], "example")
         self.assertEqual(data["required_read_hashes"], {"AGENTS.md": "abc"})
 
 

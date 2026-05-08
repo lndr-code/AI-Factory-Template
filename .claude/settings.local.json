@@ -7,7 +7,13 @@
       "Bash(git push *)",
       "Bash(xargs grep *)",
       "Bash(netstat -ano)",
-      "Bash(tasklist)"
+      "Bash(tasklist)",
+      "Bash(Get-ChildItem -Path \"c:\\\\AI_Factory\\\\AI-Factory-Template\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(Sort-Object Name)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\AI_Factory\\\\AI-Factory-Template\" -Force | ForEach-Object { if \\($_.PSIsContainer\\) { \"$\\($_.Name\\) [DIR]\" } else { \"$\\($_.Name\\) [FILE]\" } } | Sort-Object)",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(pip install *)"
     ]
   }
 }

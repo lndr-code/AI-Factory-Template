@@ -93,7 +93,7 @@ def finalize_external_patch(state: dict[str, object]) -> dict[str, object]:
                 "finalize_status": "policy_violation",
                 "patch_status": "policy_violation",
                 "task_status": "failed",
-                "policy_violation": "idp_artifact_in_patch",
+                "policy_violation": "external_artifact_in_patch",
                 "last_error": "Patch would include Factory artifacts: " + ", ".join(artifact_paths),
             }
         )

@@ -7,8 +7,8 @@ from orchestrator.external.manifest import ManifestError, load_external_target
 
 
 VALID_MANIFEST = """
-repo: git@github.com:lndr-code/idp_pipeline.git
-base_branch: develop
+repo: git@github.com:your-org/your-repo.git
+base_branch: main
 protected_branches:
   - main
 required_read_files:
@@ -20,7 +20,7 @@ planning:
 task_sources:
   - factory_task_file
 validation:
-  command: pytest tests/test_smoke.py -v
+  command: pytest tests/ -v
   mode: local
   timeout_seconds: 300
 builders:
@@ -50,10 +50,10 @@ security:
 class ExternalManifestTests(unittest.TestCase):
     def test_loads_valid_manifest(self) -> None:
         with manifest_root(VALID_MANIFEST) as root:
-            config = load_external_target("idp_pipeline", factory_root=str(root))
+            config = load_external_target("example", factory_root=str(root))
 
-        self.assertEqual(config.name, "idp_pipeline")
-        self.assertEqual(config.repo, "git@github.com:lndr-code/idp_pipeline.git")
+        self.assertEqual(config.name, "example")
+        self.assertEqual(config.repo, "git@github.com:your-org/your-repo.git")
         self.assertEqual(config.planning.architect_phase, "disabled")
         self.assertEqual(config.builders.primary, "codex")
         self.assertEqual(config.builders.fallback, "claude")
@@ -61,21 +61,21 @@ class ExternalManifestTests(unittest.TestCase):
         self.assertEqual(config.security.deny_globs[-1], "data/**")
 
     def test_missing_required_field_fails(self) -> None:
-        manifest = VALID_MANIFEST.replace("repo: git@github.com:lndr-code/idp_pipeline.git\n", "")
+        manifest = VALID_MANIFEST.replace("repo: git@github.com:your-org/your-repo.git\n", "")
         with manifest_root(manifest) as root:
             with self.assertRaisesRegex(ManifestError, "repo"):
-                load_external_target("idp_pipeline", factory_root=str(root))
+                load_external_target("example", factory_root=str(root))
 
     def test_architect_phase_must_be_disabled(self) -> None:
         manifest = VALID_MANIFEST.replace("architect_phase: disabled", "architect_phase: enabled")
         with manifest_root(manifest) as root:
             with self.assertRaisesRegex(ManifestError, "planning\\.architect_phase"):
-                load_external_target("idp_pipeline", factory_root=str(root))
+                load_external_target("example", factory_root=str(root))
 
     def test_primary_builder_may_be_claude(self) -> None:
         manifest = VALID_MANIFEST.replace("primary: codex", "primary: claude").replace("fallback: claude", "fallback: codex")
         with manifest_root(manifest) as root:
-            config = load_external_target("idp_pipeline", factory_root=str(root))
+            config = load_external_target("example", factory_root=str(root))
 
         self.assertEqual(config.builders.primary, "claude")
         self.assertEqual(config.builders.fallback, "codex")
@@ -83,7 +83,7 @@ class ExternalManifestTests(unittest.TestCase):
     def test_fallback_builder_may_be_null(self) -> None:
         manifest = VALID_MANIFEST.replace("fallback: claude", "fallback: null")
         with manifest_root(manifest) as root:
-            config = load_external_target("idp_pipeline", factory_root=str(root))
+            config = load_external_target("example", factory_root=str(root))
 
         self.assertIsNone(config.builders.fallback)
 
@@ -91,25 +91,25 @@ class ExternalManifestTests(unittest.TestCase):
         manifest = VALID_MANIFEST.replace("primary: codex", "primary: other")
         with manifest_root(manifest) as root:
             with self.assertRaisesRegex(ManifestError, "builders\\.primary"):
-                load_external_target("idp_pipeline", factory_root=str(root))
+                load_external_target("example", factory_root=str(root))
 
     def test_unknown_fallback_builder_fails(self) -> None:
         manifest = VALID_MANIFEST.replace("fallback: claude", "fallback: other")
         with manifest_root(manifest) as root:
             with self.assertRaisesRegex(ManifestError, "builders\\.fallback"):
-                load_external_target("idp_pipeline", factory_root=str(root))
+                load_external_target("example", factory_root=str(root))
 
     def test_fallback_builder_must_differ_from_primary(self) -> None:
         manifest = VALID_MANIFEST.replace("fallback: claude", "fallback: codex")
         with manifest_root(manifest) as root:
             with self.assertRaisesRegex(ManifestError, "builders\\.fallback"):
-                load_external_target("idp_pipeline", factory_root=str(root))
+                load_external_target("example", factory_root=str(root))
 
     def test_validation_command_must_not_be_empty(self) -> None:
-        manifest = VALID_MANIFEST.replace("command: pytest tests/test_smoke.py -v", "command: ''")
+        manifest = VALID_MANIFEST.replace("command: pytest tests/ -v", "command: ''")
         with manifest_root(manifest) as root:
             with self.assertRaisesRegex(ManifestError, "validation\\.command"):
-                load_external_target("idp_pipeline", factory_root=str(root))
+                load_external_target("example", factory_root=str(root))
 
 
 class manifest_root:
@@ -122,7 +122,7 @@ class manifest_root:
         root = Path(self._tmp.name)
         targets = root / "targets"
         targets.mkdir()
-        (targets / "idp_pipeline.yaml").write_text(
+        (targets / "example.yaml").write_text(
             textwrap.dedent(self._manifest_text).strip() + "\n",
             encoding="utf-8",
         )

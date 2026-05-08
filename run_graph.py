@@ -126,7 +126,7 @@ def main():
         "--external-target",
         type=str,
         default=None,
-        help="Run External Mode preflight for a configured target (e.g. idp_pipeline).",
+        help="Run External Mode preflight for a configured target (e.g. my-project).",
     )
     parser.add_argument(
         "--target-root",

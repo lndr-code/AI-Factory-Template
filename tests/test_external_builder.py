@@ -119,7 +119,7 @@ class ExternalBuilderExecutionTests(unittest.TestCase):
                 result = run_external_builder(fx.state, str(fx.task_path), builder="codex")
 
         self.assertEqual(result["builder_status"], "policy_violation")
-        self.assertEqual(result["policy_violation"], "idp_artifact_created")
+        self.assertEqual(result["policy_violation"], "external_artifact_created")
         self.assertIn("reports", result["last_error"])
 
 
@@ -133,18 +133,18 @@ class builder_fixture:
         self.factory_root.mkdir()
         self.target_root.mkdir()
         self.run_dir.mkdir(parents=True)
-        self.task_path = self.factory_root / "factory_tasks" / "idp_pipeline" / "001_task.md"
+        self.task_path = self.factory_root / "factory_tasks" / "example" / "001_task.md"
         self.task_path.parent.mkdir(parents=True)
         self.task_path.write_text("Implement the task.\n", encoding="utf-8")
         _create_git_repo(self.target_root)
         self.state = {
             "external_mode": True,
-            "external_target": "idp_pipeline",
+            "external_target": "example",
             "factory_root": str(self.factory_root),
             "target_root": str(self.target_root),
             "run_id": "run-1",
             "run_dir": str(self.run_dir),
-            "manifest_path": str(self.factory_root / "targets" / "idp_pipeline.yaml"),
+            "manifest_path": str(self.factory_root / "targets" / "example.yaml"),
             "external_builder_primary": "codex",
             "external_builder_fallback": "claude",
             "required_read_hashes": {

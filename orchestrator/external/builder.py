@@ -57,7 +57,7 @@ def run_external_builder(
                         "builder_status": "policy_violation",
                         "build_status": "policy_violation",
                         "task_status": "failed",
-                        "policy_violation": "idp_artifact_created",
+                        "policy_violation": "external_artifact_created",
                         "last_error": (
                             "Builder created Factory artifacts in TARGET_ROOT: "
                             + ", ".join(artifact_violations)

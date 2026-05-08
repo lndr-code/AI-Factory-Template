@@ -28,20 +28,20 @@ class ExternalRunnerRootTests(unittest.TestCase):
 
     def test_target_root_defaults_under_external_targets(self) -> None:
         with tempfile.TemporaryDirectory() as factory_root:
-            target_root = resolve_target_root("idp_pipeline", os.path.abspath(factory_root))
+            target_root = resolve_target_root("example_target", os.path.abspath(factory_root))
 
-        self.assertTrue(target_root.replace("\\", "/").endswith("external_targets/idp_pipeline"))
+        self.assertTrue(target_root.replace("\\", "/").endswith("external_targets/example_target"))
 
     def test_target_root_must_not_equal_factory_root(self) -> None:
         with tempfile.TemporaryDirectory() as factory_root:
             with self.assertRaisesRegex(ExternalRunnerError, "same directory"):
-                resolve_target_root("idp_pipeline", os.path.abspath(factory_root), factory_root)
+                resolve_target_root("example_target", os.path.abspath(factory_root), factory_root)
 
     def test_target_root_must_not_be_inside_sensitive_factory_dirs(self) -> None:
         with tempfile.TemporaryDirectory() as factory_root:
             bad_target = Path(factory_root) / "orchestrator" / "target"
             with self.assertRaisesRegex(ExternalRunnerError, "orchestrator"):
-                resolve_target_root("idp_pipeline", os.path.abspath(factory_root), str(bad_target))
+                resolve_target_root("example_target", os.path.abspath(factory_root), str(bad_target))
 
 
 class ExternalRunnerDenyGlobTests(unittest.TestCase):
@@ -83,7 +83,7 @@ class ExternalRunnerPreflightTests(unittest.TestCase):
 
             with patch("orchestrator.external.runner._run_git", side_effect=fake_run_git):
                 result = run_external_preflight(
-                    "idp_pipeline",
+                    "example",
                     factory_root=str(factory),
                     target_root=str(target),
                 )
@@ -91,8 +91,8 @@ class ExternalRunnerPreflightTests(unittest.TestCase):
             receipt = Path(str(result["read_receipt_path"]))
             self.assertTrue(receipt.exists())
             self.assertEqual(result["external_mode"], True)
-            self.assertEqual(result["external_target"], "idp_pipeline")
-            self.assertEqual(result["validation_command"], "pytest tests/test_smoke.py -v")
+            self.assertEqual(result["external_target"], "example")
+            self.assertEqual(result["validation_command"], "pytest tests/ -v")
 
     def test_run_external_preflight_rejects_dirty_existing_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -109,7 +109,7 @@ class ExternalRunnerPreflightTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ExternalRunnerError, "clean"):
                 run_external_preflight(
-                    "idp_pipeline",
+                    "example",
                     factory_root=str(factory),
                     target_root=str(target),
                 )
@@ -128,7 +128,7 @@ class ExternalRunnerPreflightTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ExternalRunnerError, "not a git repository"):
                 run_external_preflight(
-                    "idp_pipeline",
+                    "example",
                     factory_root=str(factory),
                     target_root=str(target),
                 )
@@ -160,7 +160,7 @@ def _create_target_repo(path: Path) -> None:
 def _write_manifest(factory_root: Path, source_repo: Path) -> None:
     targets = factory_root / "targets"
     targets.mkdir()
-    (targets / "idp_pipeline.yaml").write_text(
+    (targets / "example.yaml").write_text(
         textwrap.dedent(
             f"""
             repo: {source_repo.as_posix()}
@@ -176,7 +176,7 @@ def _write_manifest(factory_root: Path, source_repo: Path) -> None:
             task_sources:
               - factory_task_file
             validation:
-              command: pytest tests/test_smoke.py -v
+              command: pytest tests/ -v
               mode: local
               timeout_seconds: 300
             builders:

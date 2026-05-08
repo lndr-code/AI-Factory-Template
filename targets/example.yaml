@@ -1,15 +1,15 @@
-# AI-Factory-Manifest für lndr-code/idp_pipeline
-# Diese Datei lebt im AI-Factory-Repo, NICHT im IDP-Repo.
+# AI-Factory-Manifest — Beispiel-Konfiguration für ein externes Zielprojekt.
+# Kopiere diese Datei, benenne sie nach deinem Projekt und passe die Werte an.
+# Diese Datei lebt im AI-Factory-Repo, NICHT im Ziel-Repo.
 
-repo: git@github.com:lndr-code/idp_pipeline.git
-base_branch: develop
+repo: git@github.com:your-org/your-repo.git
+base_branch: main
 protected_branches:
   - main
 
 required_read_files:
   - CLAUDE.md
   - AGENTS.md
-  - docs/architecture/current_mvp.md
 
 planning:
   architect_phase: disabled
@@ -18,13 +18,13 @@ task_sources:
   - factory_task_file
 
 validation:
-  command: pytest tests/test_smoke.py -v
+  command: pytest tests/ -v
   mode: local
   timeout_seconds: 300
 
 builders:
-  primary: codex
-  fallback: claude
+  primary: claude
+  fallback: codex
 
 commit:
   enabled_from_version: v1
@@ -43,20 +43,14 @@ security:
   deny_globs:
     - .env
     - .env.*
-    - data/**
-    - input_pdfs/**
-    - output/**
-    - archive/**
-    - Testdaten/**
-    - logs/**
-    - "**/*.pdf"
+    - secrets/**
+    - "**/*.key"
+    - "**/*.pem"
   abort_if_deny_glob_present: true
   protected_paths_in_diff:
     - .github/workflows/**
-    - .devcontainer/**
     - AGENTS.md
     - CLAUDE.md
-    - docs/architecture/current_mvp.md
   log_redaction:
     drop_fields: [stdout, stderr]
     keep_fields: [exit_code, changed_files, duration_seconds, error_summary]
